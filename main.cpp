@@ -93,7 +93,7 @@ const char squarewave[256] = {
  };
 */
 
- unsigned char joyx, joyy, zbut;
+ unsigned char joyx, joyy, zbut, accx, accy;
 
 
 ISR (TIMER0_COMPA_vect){
@@ -141,8 +141,11 @@ int main(void)
           //phase = (long)(167503.724544*440.0);
           joyx = nunchuck_joyx();
           joyy = nunchuck_joyy();
-          phase = (long)(167503.724544*4.0*joyx);
-          volume = joyy/2;
+          accx = nunchuck_accelx();
+          accy = nunchuck_accely();
+          
+          phase = (long)(167503.724544*4.0*accx);
+          volume = accy/2;
         } else {
           //phase = (long)(167503.724544*880.0);
           volume = 0;
