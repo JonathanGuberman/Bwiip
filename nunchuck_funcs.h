@@ -22,8 +22,10 @@ static void nunchuck_init()
 { 
     TinyWireM.begin();                // join i2c bus as master
     TinyWireM.beginTransmission(0x52);// transmit to device 0x52
-    TinyWireM.send((uint8_t)0x40);// sends memory address
-    TinyWireM.send((uint8_t)0x00);// sends sent a zero.  
+    TinyWireM.send((uint8_t)0xF0);// sends memory address
+    TinyWireM.send((uint8_t)0x55);// sends data
+    TinyWireM.send((uint8_t)0xFB);// sends memory address
+    TinyWireM.send((uint8_t)0x00);// sends data
     TinyWireM.endTransmission();// stop transmitting
 }
 
@@ -38,11 +40,11 @@ static void nunchuck_send_request()
 
 // Encode data to format that most wiimote drivers except
 // only needed if you use one of the regular wiimote drivers
-static char nunchuk_decode_byte (char x)
+/*static char nunchuk_decode_byte (char x)
 {
     x = (x ^ 0x17) + 0x17;
     return x;
-}
+}*/
 
 // Receive data back from the nunchuck, 
 // returns 1 on successful read. returns 0 on failure
@@ -52,7 +54,7 @@ static int nunchuck_get_data()
     TinyWireM.requestFrom (0x52, 6);// request data from nunchuck
     while (TinyWireM.available ()) {
         // receive byte as an integer
-        nunchuck_buf[cnt] = nunchuk_decode_byte( TinyWireM.receive() );
+        nunchuck_buf[cnt] = TinyWireM.receive();
         cnt++;
     }
     nunchuck_send_request();  // send request for next data payload
