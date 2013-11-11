@@ -13,12 +13,14 @@
  */
 
 #include "TinyWireM.h"
+#include <util/delay.h>
+
 
 static uint8_t nunchuck_buf[6];   // array to store nunchuck data,
 
 // initialize the I2C system, join the I2C bus,
 // and tell the nunchuck we're talking to it
-static void nunchuck_init()
+static void nunchuck_init(uint8_t ext_id[])
 { 
     TinyWireM.begin();                // join i2c bus as master
     TinyWireM.beginTransmission(0x52);// transmit to device 0x52
@@ -27,6 +29,21 @@ static void nunchuck_init()
     TinyWireM.send((uint8_t)0xFB);// sends memory address
     TinyWireM.send((uint8_t)0x00);// sends data
     TinyWireM.endTransmission();// stop transmitting
+    
+    _delay_ms(10);
+    TinyWireM.beginTransmission(0x52);
+    TinyWireM.send((uint8_t)0xFA);                    // extension type register
+    TinyWireM.endTransmission();
+    _delay_ms(10);
+    
+    TinyWireM.beginTransmission(0x52);
+    TinyWireM.requestFrom((uint8_t)0x52, 6);               // request data from controller
+    for (int cnt = 0; cnt < 6; cnt++) {
+        if (TinyWireM.available()) {
+            ext_id[cnt] = TinyWireM.receive(); // Should be 0x0000 A420 0101 for Classic Controller, 0x0000 A420 0000 for nunchuck
+        }
+    }
+    TinyWireM.endTransmission();
 }
 
 // Send a request for data to the nunchuck
@@ -37,14 +54,6 @@ static void nunchuck_send_request()
     TinyWireM.send((uint8_t)0x00);// sends one byte
     TinyWireM.endTransmission();// stop transmitting
 }
-
-// Encode data to format that most wiimote drivers except
-// only needed if you use one of the regular wiimote drivers
-/*static char nunchuk_decode_byte (char x)
-{
-    x = (x ^ 0x17) + 0x17;
-    return x;
-}*/
 
 // Receive data back from the nunchuck, 
 // returns 1 on successful read. returns 0 on failure
