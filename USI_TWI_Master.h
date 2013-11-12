@@ -22,6 +22,7 @@
 #define TWI_FAST_MODE
 
 // For use with _delay_us()
+/*
 #ifdef TWI_FAST_MODE  // TWI FAST mode timing limits. SCL = 100-400kHz
   #define T2_TWI    2 // >1,3us
   #define T4_TWI    1 // >0,6us
@@ -29,11 +30,23 @@
   #define T2_TWI    5 // >4,7us
   #define T4_TWI    4 // >4,0us
 #endif
+*/
+
+#define SYS_CLK   8000.0  // [kHz]
+
+#ifdef TWI_FAST_MODE               // TWI FAST mode timing limits. SCL = 100-400kHz
+  #define T2_TWI    ((SYS_CLK *1300) /1000000) +1 // >1,3us
+  #define T4_TWI    ((SYS_CLK * 600) /1000000) +1 // >0,6us
+  
+#else                              // TWI STANDARD mode timing limits. SCL <= 100kHz
+  #define T2_TWI    ((SYS_CLK *4700) /1000000) +1 // >4,7us
+  #define T4_TWI    ((SYS_CLK *4000) /1000000) +1 // >4,0us
+#endif
 
 // Defines error code generating
 //#define PARAM_VERIFICATION
 //#define NOISE_TESTING
-#define SIGNAL_VERIFY		// This should probably be on always.
+//#define SIGNAL_VERIFY		// This should probably be on always.
 
 /****************************************************************************
   Bit and byte definitions
