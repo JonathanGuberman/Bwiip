@@ -21,7 +21,10 @@ static uint8_t nunchuck_buf[6];   // array to store nunchuck data,
 // initialize the I2C system, join the I2C bus,
 // and tell the nunchuck we're talking to it
 static void nunchuck_init(uint8_t ext_id[])
-{ 
+{
+    // Initialize device to send unencrypted data
+    // See http://wiibrew.org/wiki/Wiimote/Extension_Controllers#The_New_Way for more information
+     
     TinyWireM.begin();                // join i2c bus as master
     TinyWireM.beginTransmission(0x52);// transmit to device 0x52
     TinyWireM.send((uint8_t)0xF0);// sends memory address
@@ -30,17 +33,19 @@ static void nunchuck_init(uint8_t ext_id[])
     TinyWireM.send((uint8_t)0x00);// sends data
     TinyWireM.endTransmission();// stop transmitting
     
+    // Request the extension type code
+    // The delay before and after appear to be necessary, for unknown reasons
     _delay_ms(10);
     TinyWireM.beginTransmission(0x52);
-    TinyWireM.send((uint8_t)0xFA);                    // extension type register
+    TinyWireM.send((uint8_t)0xFA);
     TinyWireM.endTransmission();
     _delay_ms(10);
     
     TinyWireM.beginTransmission(0x52);
-    TinyWireM.requestFrom((uint8_t)0x52, 6);               // request data from controller
+    TinyWireM.requestFrom((uint8_t)0x52, 6);
     for (int cnt = 0; cnt < 6; cnt++) {
         if (TinyWireM.available()) {
-            ext_id[cnt] = TinyWireM.receive(); // Should be 0x0000 A420 0101 for Classic Controller, 0x0000 A420 0000 for nunchuck
+            ext_id[cnt] = TinyWireM.receive();
         }
     }
     TinyWireM.endTransmission();
@@ -67,7 +72,6 @@ static int nunchuck_get_data()
         cnt++;
     }
     nunchuck_send_request();  // send request for next data payload
-    // If we recieved the 6 bytes, then go print them
     if (cnt >= 5) {
         return 1;   // success
     }
