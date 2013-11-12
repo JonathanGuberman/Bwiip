@@ -94,7 +94,7 @@ const char squarewave[256] = {
 */
 
  unsigned char joyx, joyy, zbut, accx, accy;
-
+ uint8_t ext_id[6];
 
 ISR (TIMER0_COMPA_vect){
     accumulator += phase;
@@ -130,34 +130,35 @@ int main(void)
     // for a 32-bit DDS accumulator, running at Fclock:
     // phase = 2^32*Fout/Fclock (where Fclock is the refresh rate)
     // FIX MATH LATER
-    phase = (long)(167503.724544*660.0);    
+    // phase = (long)(167503.724544*660.0);    
     sei();
     
-    nunchuck_init();
-    _delay_ms(1000);
-    for(;;){
-        // Get nunchuck data
+    
+    do{
+      _delay_ms(100);
+      nunchuck_init(ext_id);
+    } while(ext_id[2] != 0xA4);
+    //if(ext_id[0] == 0 && ext_id[1] == 0 && ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
+    {
+      for(;;){
         if(nunchuck_get_data()){
-          //phase = (long)(167503.724544*440.0);
-          joyx = nunchuck_joyx();
-          joyy = nunchuck_joyy();
-          accx = nunchuck_accelx();
-          accy = nunchuck_accely();
-          
-          phase = (long)(167503.724544*4.0*accx);
-          volume = accy/2;
+          if(nunchuck_zbutton() == 0){
+            phase = (long)(167503.724544*4.0*nunchuck_accelx());
+          }
+          if(nunchuck_cbutton() == 0){
+            volume = (nunchuck_accely()-75);
+          }
         } else {
-          //phase = (long)(167503.724544*880.0);
           volume = 0;
         }
 
-        /*joyx = nunchuck_joyx();
-        joyy = nunchuck_joyy();
-        zbut = nunchuck_zbutton();
-        
-        phase = (long)(167503.724544*joyx*4);*/
-        
         _delay_ms(10);
-    }
+      }
+    };
+    
+    while(true){
+      volume = 0;
+    };
+    
     return 0;   /* never reached */
 }
