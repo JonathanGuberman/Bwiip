@@ -146,7 +146,7 @@ int main(void)
             phase = (long)(167503.724544*4.0*nunchuck_accelx());
           }
           if(nunchuck_cbutton() == 0){
-            volume = (nunchuck_accely()-75);
+            volume = (nunchuck_accely() >> 2) - 75;
           }
         } else {
           volume = 0;
