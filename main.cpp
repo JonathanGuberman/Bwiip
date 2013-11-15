@@ -12,7 +12,7 @@
 #include <avr/pgmspace.h>
 
  volatile unsigned long accumulator, phase, volume;
- //volatile unsigned char volume;
+ volatile uint8_t pulse_width = 127;
  unsigned char outvalue;
  
 
@@ -106,7 +106,7 @@ const char squarewave[256] = {
 ISR (TIMER0_COMPA_vect){
     accumulator += phase;
     
-    outvalue = volume*((accumulator >> 31) ? 1 : -1) + 127;
+    outvalue = volume*(((accumulator >> 24) > pulse_width) ? 1 : -1) + 127;
     
     OCR1B = outvalue;
 }
@@ -161,9 +161,11 @@ int main(void)
           if(nunchuck_cbutton() == 0){
             volume = (255-75) - (nunchuck_accely() >> 2); // Reversed so that "down" is mute and "up" is loud
           }
+          pulse_width = nunchuck_joyy()/2 + 64;
         } else {
           volume = 0;
         }
+        _delay_ms(10); // This is important for first party controllers. Don't delete!
       }
     };
     
