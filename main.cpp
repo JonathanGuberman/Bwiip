@@ -159,7 +159,9 @@ int main(void)
            * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
            */
           phase = (((long)pgm_read_word(&compressed_cents[accel_x + (nunchuck_joyx() >> 1)  - 32]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
-          if(nunchuck_cbutton() == 0){
+          if(nunchuck_cbutton()){
+            volume = 0;
+          } else {
             volume = (255-75) - (nunchuck_accely() >> 2); // Reversed so that "down" is mute and "up" is loud
           }
           pulse_width = nunchuck_joyy()/2 + 64;
