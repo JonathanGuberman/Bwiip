@@ -15,6 +15,7 @@
 #include "TinyWireM.h"
 #include <util/delay.h>
 
+#define WII_I2C_ADDR 0x52
 
 static uint8_t nunchuck_buf[6];   // array to store nunchuck data,
 
@@ -26,7 +27,7 @@ static void nunchuck_init(uint8_t ext_id[])
     // See http://wiibrew.org/wiki/Wiimote/Extension_Controllers#The_New_Way for more information
      
     TinyWireM.begin();                // join i2c bus as master
-    TinyWireM.beginTransmission(0x52);// transmit to device 0x52
+    TinyWireM.beginTransmission(WII_I2C_ADDR);// transmit to device 0x52
     TinyWireM.send((uint8_t)0xF0);// sends memory address
     TinyWireM.send((uint8_t)0x55);// sends data
     TinyWireM.send((uint8_t)0xFB);// sends memory address
@@ -36,13 +37,13 @@ static void nunchuck_init(uint8_t ext_id[])
     // Request the extension type code
     // The delay before and after appear to be necessary, for unknown reasons
     _delay_ms(10);
-    TinyWireM.beginTransmission(0x52);
+    TinyWireM.beginTransmission(WII_I2C_ADDR);
     TinyWireM.send((uint8_t)0xFA);
     TinyWireM.endTransmission();
     _delay_ms(10);
     
-    TinyWireM.beginTransmission(0x52);
-    TinyWireM.requestFrom((uint8_t)0x52, 6);
+    TinyWireM.beginTransmission(WII_I2C_ADDR);
+    TinyWireM.requestFrom((uint8_t)WII_I2C_ADDR, 6);
     for (int cnt = 0; cnt < 6; cnt++) {
         if (TinyWireM.available()) {
             ext_id[cnt] = TinyWireM.receive();
@@ -55,17 +56,17 @@ static void nunchuck_init(uint8_t ext_id[])
 // was "send_zero()"
 static void nunchuck_send_request()
 {
-    TinyWireM.beginTransmission(0x52);// transmit to device 0x52
+    TinyWireM.beginTransmission(WII_I2C_ADDR);// transmit to device 0x52
     TinyWireM.send((uint8_t)0x00);// sends one byte
     TinyWireM.endTransmission();// stop transmitting
 }
 
 // Receive data back from the nunchuck, 
 // returns 1 on successful read. returns 0 on failure
-static int nunchuck_get_data()
+static uint8_t nunchuck_get_data()
 {
-    int cnt=0;
-    TinyWireM.requestFrom (0x52, 6);// request data from nunchuck
+    uint8_t cnt=0;
+    TinyWireM.requestFrom (WII_I2C_ADDR, 6);// request data from nunchuck
     while (TinyWireM.available ()) {
         // receive byte as an integer
         nunchuck_buf[cnt] = TinyWireM.receive();
@@ -80,43 +81,43 @@ static int nunchuck_get_data()
 
 
 // returns zbutton state: 1=pressed, 0=notpressed
-static int nunchuck_zbutton()
+static uint8_t nunchuck_zbutton()
 {
     return ((nunchuck_buf[5] >> 0) & 1) ? 0 : 1;  // voodoo
 }
 
 // returns zbutton state: 1=pressed, 0=notpressed
-static int nunchuck_cbutton()
+static uint8_t nunchuck_cbutton()
 {
     return ((nunchuck_buf[5] >> 1) & 1) ? 0 : 1;  // voodoo
 }
 
 // returns value of x-axis joystick
-static int nunchuck_joyx()
+static uint8_t nunchuck_joyx()
 {
     return nunchuck_buf[0]; 
 }
 
 // returns value of y-axis joystick
-static int nunchuck_joyy()
+static uint8_t nunchuck_joyy()
 {
     return nunchuck_buf[1];
 }
 
 // returns value of x-axis accelerometer
-static int nunchuck_accelx()
+static uint16_t nunchuck_accelx()
 {
     return nunchuck_buf[2];   // FIXME: this leaves out 2-bits of the data
 }
 
 // returns value of y-axis accelerometer
-static int nunchuck_accely()
+static uint16_t nunchuck_accely()
 {
     return nunchuck_buf[3];   // FIXME: this leaves out 2-bits of the data
 }
 
 // returns value of z-axis accelerometer
-static int nunchuck_accelz()
+static uint16_t nunchuck_accelz()
 {
     return nunchuck_buf[4];   // FIXME: this leaves out 2-bits of the data
 }
