@@ -100,9 +100,9 @@ const char squarewave[256] = {
 #define DECOMPRESS_OFFSET 49799
 #define DECOMPRESS_FACTOR 3
 
- unsigned char joyx, joyy, zbut, accx, accy;
  uint8_t ext_id[6];
-
+ uint16_t accel_x;
+ 
 ISR (TIMER0_COMPA_vect){
     accumulator += phase;
     
@@ -151,13 +151,14 @@ int main(void)
       for(;;){
         if(nunchuck_get_data()){
           if(nunchuck_zbutton() == 0){
-            /* Read the "compressed" phase from memory,
-             * multiply it by the division factor,
-             * then add the offset back on,
-             * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
-             */
-            phase = (((long)pgm_read_word(&compressed_cents[nunchuck_accelx() + (nunchuck_joyx() >> 2)  - 32]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
+            accel_x = nunchuck_accelx();
           }
+          /* Read the "compressed" phase from memory,
+           * multiply it by the division factor,
+           * then add the offset back on,
+           * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
+           */
+          phase = (((long)pgm_read_word(&compressed_cents[accel_x + (nunchuck_joyx() >> 2)  - 32]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
           if(nunchuck_cbutton() == 0){
             volume = (255-75) - (nunchuck_accely() >> 2); // Reversed so that "down" is mute and "up" is loud
           }
