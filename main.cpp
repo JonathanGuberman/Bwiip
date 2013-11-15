@@ -156,7 +156,7 @@ int main(void)
              * then add the offset back on,
              * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
              */
-            phase = (((long)pgm_read_word(&compressed_cents[nunchuck_accelx()]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
+            phase = (((long)pgm_read_word(&compressed_cents[nunchuck_accelx() + (nunchuck_joyx() >> 2)  - 32]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
           }
           if(nunchuck_cbutton() == 0){
             volume = (255-75) - (nunchuck_accely() >> 2); // Reversed so that "down" is mute and "up" is loud
@@ -164,8 +164,6 @@ int main(void)
         } else {
           volume = 0;
         }
-
-        _delay_ms(10);
       }
     };
     
