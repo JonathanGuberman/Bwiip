@@ -4,6 +4,7 @@
  * License: <insert your license reference here>
  */
 
+#include <stdlib.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
@@ -12,10 +13,8 @@
 #include <avr/pgmspace.h>
 #include "cents.h"
 
- volatile uint32_t accumulator, phase, volume, vib_accumulator, vib_phase;
- uint8_t outvalue;
- 
-
+volatile uint32_t accumulator, phase, volume, vib_accumulator, vib_phase;
+uint8_t outvalue; 
 
 const int8_t squarewave[256] PROGMEM = {
  127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
@@ -34,9 +33,9 @@ const int8_t squarewave[256] PROGMEM = {
  -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
  -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
  -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 
- };
+};
 
- const int8_t trianglewave[256] PROGMEM = {
+const int8_t trianglewave[256] PROGMEM = {
  -127 , -125 , -123 , -121 , -119 , -117 , -115 , -113 , -111 , -109 , -107 , -105 , -103 , -101 , -99 , -97 , 
  -95 , -93 , -91 , -89 , -87 , -85 , -83 , -81 , -79 , -77 , -75 , -73 , -71 , -69 , -67 , -65 , 
  -63 , -61 , -59 , -57 , -55 , -53 , -51 , -49 , -47 , -45 , -43 , -41 , -39 , -37 , -35 , -33 , 
@@ -53,9 +52,9 @@ const int8_t squarewave[256] PROGMEM = {
  -31 , -33 , -35 , -37 , -39 , -41 , -43 , -45 , -47 , -49 , -51 , -53 , -55 , -57 , -59 , -61 , 
  -63 , -65 , -67 , -69 , -71 , -73 , -75 , -77 , -79 , -81 , -83 , -85 , -87 , -89 , -91 , -93 , 
  -95 , -97 , -99 , -101 , -103 , -105 , -107 , -109 , -111 , -113 , -115 , -117 , -119 , -121 , -123 , -125 
- };
+};
 
- const int8_t sawtoothwave[256] PROGMEM = {
+const int8_t sawtoothwave[256] PROGMEM = {
  -127 , -127 , -126 , -125 , -124 , -123 , -122 , -121 , -120 , -119 , -118 , -117 , -116 , -115 , -114 , -113 , 
  -112 , -111 , -110 , -109 , -108 , -107 , -106 , -105 , -104 , -103 , -102 , -101 , -100 , -99 , -98 , -97 , 
  -96 , -95 , -94 , -93 , -92 , -91 , -90 , -89 , -88 , -87 , -86 , -85 , -84 , -83 , -82 , -81 , 
@@ -72,9 +71,9 @@ const int8_t squarewave[256] PROGMEM = {
  80 , 81 , 82 , 83 , 84 , 85 , 86 , 87 , 88 , 89 , 90 , 91 , 92 , 93 , 94 , 95 , 
  96 , 97 , 98 , 99 , 100 , 101 , 102 , 103 , 104 , 105 , 106 , 107 , 108 , 109 , 110 , 111 , 
  112 , 113 , 114 , 115 , 116 , 117 , 118 , 119 , 120 , 121 , 122 , 123 , 124 , 125 , 126 , 127 
- };
+};
 
- const int8_t sinewave[256] PROGMEM = {
+const int8_t sinewave[256] PROGMEM = {
  0 , 3 , 6 , 9 , 12 , 15 , 18 , 21 , 24 , 27 , 30 , 33 , 36 , 39 , 42 , 45 , 
  48 , 51 , 54 , 57 , 59 , 62 , 65 , 67 , 70 , 73 , 75 , 78 , 80 , 82 , 85 , 87 , 
  89 , 91 , 94 , 96 , 98 , 100 , 102 , 103 , 105 , 107 , 108 , 110 , 112 , 113 , 114 , 116 , 
@@ -91,14 +90,16 @@ const int8_t squarewave[256] PROGMEM = {
  -117 , -116 , -114 , -113 , -112 , -110 , -108 , -107 , -105 , -103 , -102 , -100 , -98 , -96 , -94 , -91 , 
  -89 , -87 , -85 , -82 , -80 , -78 , -75 , -73 , -70 , -67 , -65 , -62 , -59 , -57 , -54 , -51 , 
  -48 , -45 , -42 , -39 , -36 , -33 , -30 , -27 , -24 , -21 , -18 , -15 , -12 , -9 , -6 , -3 
- };
+};
 
 #define VIBRATO_TYPE sinewave
 
- const uint16_t compressed_cents[1024] PROGMEM = COMPRESSED_CENTS;
+const uint16_t compressed_cents[1024] PROGMEM = COMPRESSED_CENTS;
 
- uint8_t ext_id[6];
- uint16_t accel_x;
+uint8_t ext_id[6];
+
+int16_t atan2_int(int16_t y, int16_t x);
+int16_t radius(int16_t y, int16_t x);
  
 ISR (TIMER0_COMPA_vect){
     accumulator += phase;
@@ -109,8 +110,7 @@ ISR (TIMER0_COMPA_vect){
     OCR1B = outvalue;
 }
 
-int main(void)
-{  
+int main(void){  
     PLLCSR |= _BV(PLLE);               // Enable 64 MHz PLL
     _delay_ms(10);            // Stabilize
     while(!(PLLCSR & _BV(PLOCK)));     // Wait for it...
@@ -136,10 +136,13 @@ int main(void)
     // phase = 2^32*Fout/Fclock (where Fclock is the refresh rate)
     // phase = (long)(167503.724544*660.0);    
     int16_t vib_offset, phase_index;
-    vib_phase = 1000000L; // ~6Hz TODO change to const? EEPROM?
+    vib_phase = 16422L;
 
     // Enable interrupts for sound generation
     sei();
+
+    uint16_t accel_x, angle; 
+    int16_t joy_x, joy_y;
 
     do{
       _delay_ms(100);
@@ -152,12 +155,17 @@ int main(void)
           if(nunchuck_zbutton() == 0){
             accel_x = nunchuck_accelx();
           }
+          joy_x = nunchuck_joyx() - 127;
+          joy_y = nunchuck_joyy() - 127;
+          angle = atan2_int(joy_y, joy_x);
+          vib_phase = 16422L * ((angle*angle) >> 8);
+          vib_offset = ((int8_t)pgm_read_byte(&VIBRATO_TYPE[vib_accumulator >> 24])*radius(joy_y,joy_x)) >> 7;
           /* Read the "compressed" phase from memory,
            * multiply it by the division factor,
            * then add the offset back on,
            * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
            */
-          vib_offset = ((int8_t)pgm_read_byte(&VIBRATO_TYPE[vib_accumulator >> 24])*((int16_t)nunchuck_joyy() - 127)) >> 7;
+
           phase_index = accel_x + ((nunchuck_joyx() >> 1) - 32) + vib_offset;
           phase = (((uint32_t)pgm_read_word(&compressed_cents[phase_index]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
           if(nunchuck_cbutton()){
@@ -177,4 +185,33 @@ int main(void)
     };
     
     return 0;   /* never reached */
+}
+
+int16_t atan2_int(int16_t y, int16_t x){
+  /* Returns an estimate of atan2, scaled to between 0 and 255
+   * Note that this version is symmetrical about the y-axis;
+   * to get the "normal" value you would retain the sign of y
+   * and multiply the final result by that sign. In that case,
+   * this code would give values between -255 and 255. Rescaling
+   * to different ranges should be trivial.
+   */
+  if(x == 0 && y == 0){
+    return 0;
+  }
+  
+  y = abs(y); // Note: normally y's sign is needed later; see above
+  int16_t unscaled_angle;
+  
+  if(x >= 0){
+    unscaled_angle = (1 << 8) - ((x-y) << 8)/(x+y);
+  } else {
+    unscaled_angle = 3*(1 << 8) - ((x+y) << 8)/(-x+y);
+  }
+  
+  return unscaled_angle >> 2;
+}
+
+int16_t radius(int16_t y, int16_t x){
+  // Quick and dirty "radius" estimate
+  return abs(x) + abs(y);
 }
