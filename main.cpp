@@ -136,7 +136,6 @@ int main(void){
     // phase = 2^32*Fout/Fclock (where Fclock is the refresh rate)
     // phase = (long)(167503.724544*660.0);    
     int16_t vib_offset, phase_index;
-    vib_phase = 16422L;
 
     // Enable interrupts for sound generation
     sei();
@@ -158,7 +157,7 @@ int main(void){
           joy_x = nunchuck_joyx() - 127;
           joy_y = nunchuck_joyy() - 127;
           angle = atan2_int(joy_y, joy_x);
-          vib_phase = 16422L * ((angle*angle) >> 8);
+          vib_phase = 125000L + 5911L * ((angle*angle) >> 8);
           vib_offset = ((int8_t)pgm_read_byte(&VIBRATO_TYPE[vib_accumulator >> 24])*radius(joy_y,joy_x)) >> 7;
           /* Read the "compressed" phase from memory,
            * multiply it by the division factor,
