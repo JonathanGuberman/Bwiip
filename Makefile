@@ -169,7 +169,7 @@ LDFLAGS=-Wl,-Map,$(TRG).map -mmcu=$(MCU) \
 CC=avr-gcc
 OBJCOPY=avr-objcopy
 OBJDUMP=avr-objdump
-SIZE=avr-size
+SIZE=avr-size --format=avr --mcu=$(MCU)
 AVRDUDE=avrdude
 REMOVE=rm -f
 
