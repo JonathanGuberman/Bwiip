@@ -102,6 +102,8 @@ uint8_t ext_id[6];
 
 int16_t atan2_int(int16_t y, int16_t x);
 int16_t radius(int16_t y, int16_t x);
+int32_t square_scale(int32_t x);
+
  
 ISR (TIMER0_COMPA_vect){
     accumulator += phase;
@@ -156,7 +158,7 @@ int main(void){
       // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
       sei();
       for(;;){
-        vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*radius(joy_y,joy_x)) >> 7;
+        vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often
         if(counter > 250){
           if(nunchuck_get_data()){
@@ -166,7 +168,7 @@ int main(void){
             joy_x = nunchuck_joyx() - 127;
             joy_y = nunchuck_joyy() - 127;
             angle = atan2_int(joy_y, joy_x);
-            vib_phase = 125000L + 7400L * ((angle*angle) >> 8);
+            vib_phase = 125000L + 7400L * square_scale(angle);
             /* Read the "compressed" phase from memory,
              * multiply it by the division factor,
              * then add the offset back on,
@@ -222,4 +224,9 @@ int16_t atan2_int(int16_t y, int16_t x){
 int16_t radius(int16_t y, int16_t x){
   // Quick and dirty "radius" estimate
   return abs(x) + abs(y);
+}
+
+//TODO convert this to 16 bit data types without messing it all up
+int32_t square_scale(int32_t x){
+  return (x * x) >> 8;
 }
