@@ -143,10 +143,8 @@ int main(void){
     // phase = (long)(167503.724544*660.0);    
     int16_t vib_offset, phase_index;
 
-
-
-    uint16_t accel_x, angle; 
-    int16_t joy_x, joy_y;
+    uint16_t angle; 
+    int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll;
 
     do{
       _delay_ms(100);
@@ -162,25 +160,29 @@ int main(void){
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often
         if(counter > 250){
           if(nunchuck_get_data()){
-            if(nunchuck_zbutton() == 0){
-              accel_x = nunchuck_accelx();
-            }
+            accel_x = (nunchuck_accelx() >> 2) - 127;
+            accel_y = (nunchuck_accely() >> 2) - 127;
+            accel_z = (nunchuck_accelz() >> 2) - 127;
             joy_x = nunchuck_joyx() - 127;
             joy_y = nunchuck_joyy() - 127;
-            angle = atan2_int(joy_y, joy_x);
+            angle = atan2_int(abs(joy_y), joy_x);
             vib_phase = 125000L + 7400L * square_scale(angle);
+            
+            if(nunchuck_zbutton() == 0){
+              roll = atan2_int(accel_x, (accel_z < 0 ? -1 : 1) * (abs(accel_z) +abs(accel_y >> 3)));
+            }
+            
             /* Read the "compressed" phase from memory,
              * multiply it by the division factor,
              * then add the offset back on,
              * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
              */
-
-            phase_index = accel_x + vib_offset;
+            phase_index = (roll + 512) + vib_offset;
             phase = (((uint32_t)pgm_read_word(&compressed_cents[phase_index]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
             if(nunchuck_cbutton()){
               volume = 0;
             } else {
-              volume = (255-75) - (nunchuck_accely() >> 2); // Reversed so that "down" is mute and "up" is loud
+              volume = (255-75) - (accel_y + 127); // Reversed so that "down" is mute and "up" is loud
             }
           } else {
             volume = 0;
@@ -198,27 +200,22 @@ int main(void){
 }
 
 int16_t atan2_int(int16_t y, int16_t x){
-  /* Returns an estimate of atan2, scaled to between 0 and 255
-   * Note that this version is symmetrical about the y-axis;
-   * to get the "normal" value you would retain the sign of y
-   * and multiply the final result by that sign. In that case,
-   * this code would give values between -255 and 255. Rescaling
-   * to different ranges should be trivial.
-   */
+  /* 
+  *  Returns an integer estimate of atan2 scaled to between -255 and 255
+  */
   if(x == 0 && y == 0){
     return 0;
   }
-  
-  y = abs(y); // Note: normally y's sign is needed later; see above
+
+  int16_t abs_y = abs(y);
   int16_t unscaled_angle;
-  
   if(x >= 0){
-    unscaled_angle = (1 << 8) - ((x-y) << 8)/(x+y);
+    unscaled_angle = (1 << 8) - ((x-abs_y) << 8)/(x+abs_y);
   } else {
-    unscaled_angle = 3*(1 << 8) - ((x+y) << 8)/(-x+y);
+    unscaled_angle = 3*(1 << 8) - ((x+abs_y) << 8)/(-x+abs_y);
   }
-  
-  return unscaled_angle >> 2;
+  unscaled_angle >>= 2;
+  return y < 0 ? -unscaled_angle : unscaled_angle;
 }
 
 int16_t radius(int16_t y, int16_t x){
