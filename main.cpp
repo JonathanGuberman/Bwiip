@@ -14,6 +14,7 @@
 #include "cents.h"
 
 volatile uint32_t accumulator, phase, volume, vib_accumulator, vib_phase;
+volatile uint16_t counter;
 uint8_t outvalue; 
 
 const int8_t squarewave[256] PROGMEM = {
@@ -108,6 +109,8 @@ ISR (TIMER0_COMPA_vect){
     outvalue = volume*((accumulator >> 31) ? 1 : -1) + 127;
     
     OCR1B = outvalue;
+    
+    counter++;
 }
 
 int main(void){  
@@ -150,32 +153,35 @@ int main(void){
     //if(ext_id[0] == 0 && ext_id[1] == 0 && ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
     {
       for(;;){
-        if(nunchuck_get_data()){
-          if(nunchuck_zbutton() == 0){
-            accel_x = nunchuck_accelx();
-          }
-          joy_x = nunchuck_joyx() - 127;
-          joy_y = nunchuck_joyy() - 127;
-          angle = atan2_int(joy_y, joy_x);
-          vib_phase = 125000L + 5911L * ((angle*angle) >> 8);
-          vib_offset = ((int8_t)pgm_read_byte(&VIBRATO_TYPE[vib_accumulator >> 24])*radius(joy_y,joy_x)) >> 7;
-          /* Read the "compressed" phase from memory,
-           * multiply it by the division factor,
-           * then add the offset back on,
-           * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
-           */
+        vib_offset = ((int8_t)pgm_read_byte(&VIBRATO_TYPE[vib_accumulator >> 24])*radius(joy_y,joy_x)) >> 7;
+        // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often
+        if(counter > 250){
+          if(nunchuck_get_data()){
+            if(nunchuck_zbutton() == 0){
+              accel_x = nunchuck_accelx();
+            }
+            joy_x = nunchuck_joyx() - 127;
+            joy_y = nunchuck_joyy() - 127;
+            angle = atan2_int(joy_y, joy_x);
+            vib_phase = 125000L + 7400L * ((angle*angle) >> 8);
+            /* Read the "compressed" phase from memory,
+             * multiply it by the division factor,
+             * then add the offset back on,
+             * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
+             */
 
-          phase_index = accel_x + ((nunchuck_joyx() >> 1) - 32) + vib_offset;
-          phase = (((uint32_t)pgm_read_word(&compressed_cents[phase_index]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
-          if(nunchuck_cbutton()){
-            volume = 0;
+            phase_index = accel_x + ((nunchuck_joyx() >> 1) - 32) + vib_offset;
+            phase = (((uint32_t)pgm_read_word(&compressed_cents[phase_index]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
+            if(nunchuck_cbutton()){
+              volume = 0;
+            } else {
+              volume = (255-75) - (nunchuck_accely() >> 2); // Reversed so that "down" is mute and "up" is loud
+            }
           } else {
-            volume = (255-75) - (nunchuck_accely() >> 2); // Reversed so that "down" is mute and "up" is loud
+            volume = 0;
           }
-        } else {
-          volume = 0;
+          counter = 0; // Reset counter to ensure that nuncuck isn't polled too often
         }
-        _delay_ms(10); // This is important for first party controllers. Don't delete!
       }
     };
     
