@@ -140,8 +140,7 @@ int main(void){
     // phase = (long)(167503.724544*660.0);    
     int16_t vib_offset, phase_index;
 
-    // Enable interrupts for sound generation
-    sei();
+
 
     uint16_t accel_x, angle; 
     int16_t joy_x, joy_y;
@@ -152,6 +151,9 @@ int main(void){
     } while(ext_id[2] != 0xA4);
     //if(ext_id[0] == 0 && ext_id[1] == 0 && ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
     {
+      // Enable interrupts for sound generation;
+      // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
+      sei();
       for(;;){
         vib_offset = ((int8_t)pgm_read_byte(&VIBRATO_TYPE[vib_accumulator >> 24])*radius(joy_y,joy_x)) >> 7;
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often
