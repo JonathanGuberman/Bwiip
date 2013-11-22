@@ -175,7 +175,7 @@ int main(void){
              * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
              */
 
-            phase_index = accel_x + ((nunchuck_joyx() >> 1) - 32) + vib_offset;
+            phase_index = accel_x + vib_offset;
             phase = (((uint32_t)pgm_read_word(&compressed_cents[phase_index]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
             if(nunchuck_cbutton()){
               volume = 0;
