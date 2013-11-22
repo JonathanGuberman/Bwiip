@@ -93,7 +93,8 @@ const int8_t sinewave[256] PROGMEM = {
  -48 , -45 , -42 , -39 , -36 , -33 , -30 , -27 , -24 , -21 , -18 , -15 , -12 , -9 , -6 , -3 
 };
 
-#define VIBRATO_TYPE sinewave
+#define VIBRATO_TYPE1 sinewave
+#define VIBRATO_TYPE2 sawtoothwave
 
 const uint16_t compressed_cents[1024] PROGMEM = COMPRESSED_CENTS;
 
@@ -155,7 +156,7 @@ int main(void){
       // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
       sei();
       for(;;){
-        vib_offset = ((int8_t)pgm_read_byte(&VIBRATO_TYPE[vib_accumulator >> 24])*radius(joy_y,joy_x)) >> 7;
+        vib_offset = ((int8_t)pgm_read_byte(joy_y > 0 ? &VIBRATO_TYPE1[vib_accumulator >> 24] : &VIBRATO_TYPE2[vib_accumulator >> 24])*radius(joy_y,joy_x)) >> 7;
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often
         if(counter > 250){
           if(nunchuck_get_data()){
