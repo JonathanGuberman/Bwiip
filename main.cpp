@@ -11,7 +11,6 @@
 #include "TinyWireM.h"        // I2C library for ATtiny AVR
 #include "nunchuck_funcs.h"   // Wii Nunchuck helper functions
 #include <avr/pgmspace.h>
-#include "cents.h"
 
 volatile uint32_t accumulator, phase, volume, vib_accumulator, vib_phase;
 volatile uint16_t counter;
@@ -96,9 +95,12 @@ const int8_t wavetable[4][256] PROGMEM = {
 #define SAWTOOTH 2
 #define SINE 3
 
-const uint16_t compressed_cents[1024] PROGMEM = COMPRESSED_CENTS;
-
 uint8_t ext_id[6];
+
+#define BASENOTE 10955816L
+#define CENTS_LUT_SIZE 13
+#define CENTS_COMPRESS 10
+uint32_t cents_lut[CENTS_LUT_SIZE] = {8197, 8201,8211,8230,8268,8345,8501,8821,9498,11011,14800,26739,87278};
 
 int16_t atan2_int(int16_t y, int16_t x);
 int16_t radius(int16_t y, int16_t x);
@@ -141,7 +143,7 @@ int main(void){
     // for a 32-bit DDS accumulator, running at Fclock:
     // phase = 2^32*Fout/Fclock (where Fclock is the refresh rate)
     // phase = (long)(167503.724544*660.0);    
-    int16_t vib_offset, phase_index;
+    int16_t vib_offset, cents_from_basenote;
 
 
 
@@ -169,14 +171,18 @@ int main(void){
             joy_y = nunchuck_joyy() - 127;
             angle = atan2_int(joy_y, joy_x);
             vib_phase = 125000L + 7400L * square_scale(angle);
-            /* Read the "compressed" phase from memory,
-             * multiply it by the division factor,
-             * then add the offset back on,
-             * and finally multiply by the central note (i.e. << 9 is multiplying by 512, approximately treble C)
-             */
 
-            phase_index = accel_x + vib_offset;
-            phase = (((uint32_t)pgm_read_word(&compressed_cents[phase_index]) << DECOMPRESS_FACTOR) + DECOMPRESS_OFFSET) << 9;
+            cents_from_basenote = 4*(accel_x + vib_offset);
+            uint32_t temp_phase = BASENOTE;
+            for(int i = 0; i < CENTS_LUT_SIZE; ++i){
+              if(cents_from_basenote & 0x01){
+                temp_phase >>= CENTS_COMPRESS;
+                temp_phase *= (uint32_t)cents_lut[i];
+                temp_phase >>= 3;
+              }
+              cents_from_basenote >>= 1;
+            }
+            phase = temp_phase;
             if(nunchuck_cbutton()){
               volume = 0;
             } else {
