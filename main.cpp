@@ -145,10 +145,8 @@ int main(void){
     // phase = (long)(167503.724544*660.0);    
     int16_t vib_offset, cents_from_basenote;
 
-
-
-    uint16_t accel_x, angle; 
-    int16_t joy_x, joy_y;
+    uint16_t angle; 
+    int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll;
 
     do{
       _delay_ms(100);
@@ -164,15 +162,23 @@ int main(void){
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often
         if(counter > 250){
           if(nunchuck_get_data()){
-            if(nunchuck_zbutton() == 0){
-              accel_x = nunchuck_accelx();
-            }
+            // TODO modify atan2 to use full 10-bit data
+            accel_x = (nunchuck_accelx() >> 2) - 127;
+            accel_y = (nunchuck_accely() >> 2) - 127;
+            accel_z = (nunchuck_accelz() >> 2) - 127;
             joy_x = nunchuck_joyx() - 127;
             joy_y = nunchuck_joyy() - 127;
-            angle = atan2_int(joy_y, joy_x);
+            angle = atan2_int(abs(joy_y), joy_x);
+            // TODO adjust vibrato range
             vib_phase = 125000L + 7400L * square_scale(angle);
 
-            cents_from_basenote = 4*(accel_x + vib_offset);
+            // TODO make tapping the z button toggle lock-to-semitone
+            if(nunchuck_zbutton() == 0){
+              roll = atan2_int(accel_x, (accel_z < 0 ? -1 : 1) * (abs(accel_z) +abs(accel_y >> 3)));
+            }
+            
+            // TODO adjust note range
+            cents_from_basenote = 4*(roll + 512 + vib_offset);
             uint32_t temp_phase = BASENOTE;
             for(int i = 0; i < CENTS_LUT_SIZE; ++i){
               if(cents_from_basenote & 0x01){
@@ -183,15 +189,16 @@ int main(void){
               cents_from_basenote >>= 1;
             }
             phase = temp_phase;
+
             if(nunchuck_cbutton()){
               volume = 0;
             } else {
-              volume = (255-75) - (nunchuck_accely() >> 2); // Reversed so that "down" is mute and "up" is loud
+              volume = (255-75) - (accel_y + 127); // Reversed so that "down" is mute and "up" is loud
             }
           } else {
             volume = 0;
           }
-          counter = 0; // Reset counter to ensure that nuncuck isn't polled too often
+          counter = 0; // Reset counter to ensure that nunchuck isn't polled too often
         }
       }
     };
@@ -204,27 +211,23 @@ int main(void){
 }
 
 int16_t atan2_int(int16_t y, int16_t x){
-  /* Returns an estimate of atan2, scaled to between 0 and 255
-   * Note that this version is symmetrical about the y-axis;
-   * to get the "normal" value you would retain the sign of y
-   * and multiply the final result by that sign. In that case,
-   * this code would give values between -255 and 255. Rescaling
-   * to different ranges should be trivial.
-   */
+  /* 
+  *  Returns an integer estimate of atan2 scaled to between -255 and 255
+  *  TODO modify to accept and return full 10-bit data (or more generally, user-specified data size)
+  */
   if(x == 0 && y == 0){
     return 0;
   }
-  
-  y = abs(y); // Note: normally y's sign is needed later; see above
+
+  int16_t abs_y = abs(y);
   int16_t unscaled_angle;
-  
   if(x >= 0){
-    unscaled_angle = (1 << 8) - ((x-y) << 8)/(x+y);
+    unscaled_angle = (1 << 8) - ((x-abs_y) << 8)/(x+abs_y);
   } else {
-    unscaled_angle = 3*(1 << 8) - ((x+y) << 8)/(-x+y);
+    unscaled_angle = 3*(1 << 8) - ((x+abs_y) << 8)/(-x+abs_y);
   }
-  
-  return unscaled_angle >> 2;
+  unscaled_angle >>= 2;
+  return y < 0 ? -unscaled_angle : unscaled_angle;
 }
 
 int16_t radius(int16_t y, int16_t x){
