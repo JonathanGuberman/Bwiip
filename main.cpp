@@ -174,6 +174,11 @@ int main(void){
 
             // TODO make tapping the z button toggle lock-to-semitone
             if(nunchuck_zbutton() == 0){
+              /* 
+               * Roll from three access accelerometer equation adapted from Freescale Semiconductors application
+               * note "Tilt Sensing Using a Three-Axis Accelerometer" (AN3461, rev 6), equation #38
+               * http://www.freescale.com/files/sensors/doc/app_note/AN3461.pdf
+               */
               roll = atan2_int(accel_x, (accel_z < 0 ? -1 : 1) * (abs(accel_z) +abs(accel_y >> 3)));
             }
             
