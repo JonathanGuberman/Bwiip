@@ -97,9 +97,14 @@ const int8_t wavetable[4][256] PROGMEM = {
 
 uint8_t ext_id[6];
 
-#define BASENOTE 10955816L
+#define SAMPLE_RATE 25000
+#define COUNTER_OVERFLOW ((F_CPU/8)/SAMPLE_RATE)
+#define PHASESCALE (((uint64_t)1 << 32)/(1000000.0/(COUNTER_OVERFLOW-1.0)))
+#define BASENOTE (uint32_t)(PHASESCALE*65.4064 + 0.5)
 #define CENTS_LUT_SIZE 13
 #define CENTS_COMPRESS 10
+
+// TODO calculate from sample rate and clock speed
 uint32_t cents_lut[CENTS_LUT_SIZE] = {8197, 8201,8211,8230,8268,8345,8501,8821,9498,11011,14800,26739,87278};
 
 int16_t atan2_int(int16_t y, int16_t x);
@@ -136,7 +141,7 @@ int main(void){
     // INTERRUPT SETUP
     TCCR0B = _BV(CS01); 	//CLK_IO/8
     TCCR0A = _BV(WGM01);	// clear on match
-    OCR0A = 40; // Approximately 24kHz sampling rate
+    OCR0A = COUNTER_OVERFLOW; // Approximately 24kHz sampling rate
     TIMSK = (1<<OCIE0A);
     
     // init the DDS phase increment
@@ -159,8 +164,8 @@ int main(void){
       sei();
       for(;;){
         vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
-        // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often
-        if(counter > 250){
+        // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often (10ms = 1/100s, hence the div by 100)
+        if(counter > SAMPLE_RATE/100){
           if(nunchuck_get_data()){
             // TODO modify atan2 to use full 10-bit data
             accel_x = (nunchuck_accelx() >> 2) - 127;
@@ -169,7 +174,7 @@ int main(void){
             joy_x = nunchuck_joyx() - 127;
             joy_y = nunchuck_joyy() - 127;
             angle = atan2_int(abs(joy_y), joy_x);
-            // TODO adjust vibrato range
+            // TODO adjust vibrato range, calculate from constants
             vib_phase = 125000L + 7400L * square_scale(angle);
 
             // TODO make tapping the z button toggle lock-to-semitone
