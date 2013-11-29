@@ -21,7 +21,7 @@ static uint8_t nunchuck_buf[6];   // array to store nunchuck data,
 
 // initialize the I2C system, join the I2C bus,
 // and tell the nunchuck we're talking to it
-static void nunchuck_init(uint8_t ext_id[])
+static void extension_init(uint8_t ext_id[])
 {
     // Initialize device to send unencrypted data
     // See http://wiibrew.org/wiki/Wiimote/Extension_Controllers#The_New_Way for more information
@@ -54,7 +54,7 @@ static void nunchuck_init(uint8_t ext_id[])
 
 // Send a request for data to the nunchuck
 // was "send_zero()"
-static void nunchuck_send_request()
+static void extension_send_request()
 {
     TinyWireM.beginTransmission(WII_I2C_ADDR);// transmit to device 0x52
     TinyWireM.send((uint8_t)0x00);// sends one byte
@@ -63,7 +63,7 @@ static void nunchuck_send_request()
 
 // Receive data back from the nunchuck, 
 // returns 1 on successful read. returns 0 on failure
-static uint8_t nunchuck_get_data()
+static uint8_t extension_get_data()
 {
     uint8_t cnt=0;
     TinyWireM.requestFrom (WII_I2C_ADDR, 6);// request data from nunchuck
@@ -72,7 +72,7 @@ static uint8_t nunchuck_get_data()
         nunchuck_buf[cnt] = TinyWireM.receive();
         cnt++;
     }
-    nunchuck_send_request();  // send request for next data payload
+    extension_send_request();  // send request for next data payload
     if (cnt >= 5) {
         return 1;   // success
     }
@@ -120,4 +120,9 @@ static uint16_t nunchuck_accely()
 static uint16_t nunchuck_accelz()
 {
     return (nunchuck_buf[4] << 2) | ((nunchuck_buf[5] >> 6) & 3);
+}
+
+static uint8_t extension_classic_buttons()
+{
+    return ((~nunchuck_buf[5]) >> 3) & 0xF;
 }
