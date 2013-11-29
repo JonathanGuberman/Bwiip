@@ -165,10 +165,12 @@ int main(void){
       // Enable interrupts for sound generation;
       // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
       sei();
+      counter=0;
       while(bit_is_set(PINB,PB3)){
         vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often (10ms = 1/100s, hence the div by 100)
         if(counter > SAMPLE_RATE/100){
+          counter = 0; // Reset counter to ensure that nunchuck isn't polled too often
           if(nunchuck_get_data()){
             // TODO modify atan2 to use full 10-bit data
             accel_x = (nunchuck_accelx() >> 2) - 127;
@@ -208,10 +210,9 @@ int main(void){
             } else {
               volume = (255-75) - (accel_y + 127); // Reversed so that "down" is mute and "up" is loud
             }
-          } else {
+          } /*else {
             volume = 0;
-          }
-          counter = 0; // Reset counter to ensure that nunchuck isn't polled too often
+          }*/
         }
       }
     };
