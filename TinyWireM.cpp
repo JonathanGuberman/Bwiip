@@ -55,7 +55,7 @@ void USI_TWI::send(uint8_t data){ // buffers up data to send
 uint8_t USI_TWI::endTransmission(){ // actually sends the buffer
   bool xferOK = false;
   uint8_t errorCode = 0;
-  xferOK = USI_TWI_Start_Read_Write(USI_Buf,USI_BufIdx+1); // core func that does the work
+  xferOK = USI_TWI_Start_Transceiver_With_Data(USI_Buf,USI_BufIdx+1); // core func that does the work
   USI_BufIdx = 0;
   if (xferOK) return 0;
   else {                                  // there was an error
@@ -71,7 +71,7 @@ uint8_t USI_TWI::requestFrom(uint8_t slaveAddr, uint8_t numBytes){ // setup for 
   USI_BytesAvail = numBytes; // save this off in a global
   numBytes++;                // add extra byte to transmit header
   USI_Buf[0] = (slaveAddr<<TWI_ADR_BITS) | USI_RCVE;   // setup address & Rcve bit
-  xferOK = USI_TWI_Start_Read_Write(USI_Buf,numBytes); // core func that does the work
+  xferOK = USI_TWI_Start_Transceiver_With_Data(USI_Buf,numBytes); // core func that does the work
   // USI_Buf now holds the data read
   if (xferOK) return 0;
   else {                                  // there was an error
