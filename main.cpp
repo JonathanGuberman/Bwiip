@@ -96,7 +96,7 @@ const int8_t wavetable[4][256] PROGMEM = {
 #define SINE 3
 
 uint8_t ext_id[6];
-//const uint8_t button_intervals[15] = {7, 11, }
+const int8_t button_intervals[15] = {4, 7, 5, 0, 2, 1, 3, 11, 8, 9, 6, 12, 13, 10, -1};
 
 #define SAMPLE_RATE 25000
 #define COUNTER_OVERFLOW ((F_CPU/8)/SAMPLE_RATE)
@@ -209,25 +209,12 @@ int main(void){
               }
             } else if (ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
             { //Classic or Pro
-              uint8_t classic_buttons = extension_classic_buttons();
-              //phase = phase_from_cents(2048);
-              volume = (classic_buttons ? 127 : 0);
-              switch(classic_buttons){
-                case 0x01:
-                  phase = phase_from_cents(2048 + 400);
-                  break;
-                case 0x02:
-                  phase = phase_from_cents(2048 + 700);
-                  break;
-                case 0x04:
-                  phase = phase_from_cents(2048);
-                  break;
-                case 0x08:
-                  phase = phase_from_cents(2048 + 1200);
-                  break;
-                default:
-                  volume = 0;
-                  break;
+              uint8_t classic_byax = extension_classic_byax();
+              if(classic_byax){
+                phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1]);
+                volume = 127;
+              } else {
+                volume = 0;
               }
             }
           }

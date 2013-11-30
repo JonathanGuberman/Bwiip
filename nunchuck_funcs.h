@@ -122,7 +122,7 @@ static uint16_t nunchuck_accelz()
     return (nunchuck_buf[4] << 2) | ((nunchuck_buf[5] >> 6) & 3);
 }
 
-static uint8_t extension_classic_buttons()
+static uint8_t extension_classic_byax()
 {
     return ((~nunchuck_buf[5]) >> 3) & 0xF;
 }
