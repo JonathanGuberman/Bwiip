@@ -157,6 +157,7 @@ int main(void){
       cli();
       loop_until_bit_is_set(PINB,PB3);
 
+      sei();
       do{
         _delay_ms(100);
         nunchuck_init(ext_id);
@@ -164,8 +165,7 @@ int main(void){
       //if(ext_id[0] == 0 && ext_id[1] == 0 && ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
       // Enable interrupts for sound generation;
       // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
-      sei();
-      counter=0;
+      //sei();
       while(bit_is_set(PINB,PB3)){
         vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often (10ms = 1/100s, hence the div by 100)
@@ -213,6 +213,8 @@ int main(void){
           } /*else {
             volume = 0;
           }*/
+            counter=0;
+          
         }
       }
     };
