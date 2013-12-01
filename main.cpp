@@ -12,11 +12,14 @@
 #include "nunchuck_funcs.h"   // Wii Nunchuck helper functions
 #include <avr/pgmspace.h>
 
-volatile uint32_t accumulator, phase, volume, vib_accumulator, vib_phase;
+volatile uint32_t accumulator, phase, vib_accumulator, vib_phase;
 volatile uint16_t counter;
+volatile uint8_t volume;
+
 uint8_t outvalue; 
 
-const int8_t wavetable[4][256] PROGMEM = {
+#define TOTALWAVES 4
+const int8_t wavetable[TOTALWAVES][256] PROGMEM = {
   {
     127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
     127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
@@ -94,6 +97,7 @@ const int8_t wavetable[4][256] PROGMEM = {
 #define TRIANGLE 1
 #define SAWTOOTH 2
 #define SINE 3
+volatile int8_t currentwave = SQUARE;
 
 uint8_t ext_id[6];
 const int8_t button_intervals[15] = {4, 7, 5, 0, 2, 1, 3, 11, 8, 9, 6, 12, 13, 10, -1};
@@ -119,7 +123,8 @@ ISR (TIMER0_COMPA_vect){
     accumulator += phase;
     vib_accumulator += vib_phase;
     
-    outvalue = volume*((accumulator >> 31) ? 1 : -1) + 127;
+    //outvalue = volume*((accumulator >> 31) ? 1 : -1) + 127;
+    outvalue = (volume*((int8_t)pgm_read_byte(&wavetable[currentwave][accumulator >> 24])) >> 8) + 127;
     
     OCR1B = outvalue;
     
@@ -210,11 +215,21 @@ int main(void){
             } else if (ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
             { //Classic or Pro
               uint8_t classic_byax = extension_classic_byax();
+              uint8_t classic_dpad = extension_classic_dpad();
               if(classic_byax){
                 phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1]);
                 volume = 127;
               } else {
                 volume = 0;
+              }
+              if(classic_dpad){
+                for(int dpadcount = 0; dpadcount < 4; ++dpadcount){
+                  if(classic_dpad & 1){
+                    currentwave = dpadcount;
+                    break;
+                  }
+                  classic_dpad >>= 1;
+                }
               }
             }
           }

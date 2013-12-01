@@ -126,3 +126,8 @@ static uint8_t extension_classic_byax()
 {
     return ((~nunchuck_buf[5]) >> 3) & 0xF;
 }
+
+static uint8_t extension_classic_dpad()
+{
+    return (((~nunchuck_buf[4] >> 4) & 0xC) | (~nunchuck_buf[5] & 0x3)) & 0xF;
+}
