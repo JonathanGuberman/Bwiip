@@ -217,7 +217,7 @@ int main(void){
               uint8_t classic_byax = extension_classic_byax();
               uint8_t classic_dpad = extension_classic_dpad();
               if(classic_byax){
-                phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1]);
+                phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1] + vib_offset);
                 volume = 127;
               } else {
                 volume = 0;
@@ -231,6 +231,11 @@ int main(void){
                   classic_dpad >>= 1;
                 }
               }
+              joy_x = (extension_classic_ljoyx() << 2) - 127;
+              joy_y = (extension_classic_ljoyy() << 2) - 127;
+              angle = atan2_int(abs(joy_y), joy_x);
+              // TODO adjust vibrato range, calculate from constants
+              vib_phase = 125000L + 7400L * square_scale(angle);
             }
           }
         }

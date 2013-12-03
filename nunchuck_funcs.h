@@ -131,3 +131,25 @@ static uint8_t extension_classic_dpad()
 {
     return (((~nunchuck_buf[4] >> 4) & 0xC) | (~nunchuck_buf[5] & 0x3)) & 0xF;
 }
+
+static uint8_t extension_classic_ljoyx()
+{
+    return nunchuck_buf[0] & 0x3F;
+}
+
+static uint8_t extension_classic_ljoyy()
+{
+    return nunchuck_buf[1] & 0x3F;
+}
+
+static uint8_t extension_classic_rjoyx()
+{
+    return ((nunchuck_buf[0] & 0xC0) >> 3) | ((nunchuck_buf[1] & 0xC0) >> 5) | (nunchuck_buf[2] >> 7);
+}
+
+static uint8_t extension_classic_rjoyy()
+{
+    return nunchuck_buf[2] & 0x1F;
+}
+
+
