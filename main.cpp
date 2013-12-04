@@ -13,8 +13,10 @@
 #include <avr/pgmspace.h>
 
 volatile uint32_t accumulator, phase, vib_accumulator, vib_phase;
-volatile uint16_t counter;
+volatile uint16_t counter, env_accumulator, env_phase;
 volatile uint8_t volume;
+volatile bool was_pressed;
+
 
 uint8_t outvalue; 
 
@@ -102,12 +104,15 @@ volatile int8_t currentwave = SQUARE;
 uint8_t ext_id[6];
 const int8_t button_intervals[15] = {4, 7, 5, 0, 2, 1, 3, 11, 8, 9, 6, 12, 13, 10, -1};
 
-#define SAMPLE_RATE 25000
+#define SAMPLE_RATE 12000
 #define COUNTER_OVERFLOW ((F_CPU/8)/SAMPLE_RATE)
 #define PHASESCALE (((uint64_t)1 << 32)/(1000000.0/(COUNTER_OVERFLOW-1.0)))
 #define BASENOTE (uint32_t)(PHASESCALE*65.4064 + 0.5)
+#define VIB_BASE (uint32_t)(PHASESCALE*0.75 + 0.5)
+#define VIB_SCALE (uint32_t)(PHASESCALE*0.044 + 0.5)
 #define CENTS_LUT_SIZE 13
 #define CENTS_COMPRESS 10
+#define DEBOUNCE 5
 
 // TODO calculate from sample rate and clock speed
 uint32_t cents_lut[CENTS_LUT_SIZE] = {8197, 8201,8211,8230,8268,8345,8501,8821,9498,11011,14800,26739,87278};
@@ -122,6 +127,7 @@ uint32_t phase_from_cents(int16_t cents);
 ISR (TIMER0_COMPA_vect){
     accumulator += phase;
     vib_accumulator += vib_phase;
+    env_accumulator += env_phase;
     
     //outvalue = volume*((accumulator >> 31) ? 1 : -1) + 127;
     outvalue = (volume*((int8_t)pgm_read_byte(&wavetable[currentwave][accumulator >> 24])) >> 8) + 127;
@@ -158,7 +164,7 @@ int main(void){
     // phase = (long)(167503.724544*660.0);    
     int16_t vib_offset;
 
-    uint16_t angle; 
+    uint16_t angle, last_byax, debounce_byax; 
 
     for(;;){
       cli();
@@ -177,12 +183,20 @@ int main(void){
         int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll;
         
         vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
+        
+        if(volume && !was_pressed && (env_accumulator & (1<<15))){
+          volume--;
+          env_accumulator = 0;
+        }
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often (10ms = 1/100s, hence the div by 100)
         if(counter > SAMPLE_RATE/100){
           counter = 0; // Reset counter to ensure that nunchuck isn't polled too often
           if(extension_get_data()){
             if(ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x00 && ext_id[5] == 0x00)
             { // Nunchuck
+              env_phase = 0;
+              env_accumulator = 0;
+              was_pressed = true;
               
               // TODO modify atan2 to use full 10-bit data
               accel_x = (nunchuck_accelx() >> 2) - 127;
@@ -192,7 +206,7 @@ int main(void){
               joy_y = nunchuck_joyy() - 127;
               angle = atan2_int(abs(joy_y), joy_x);
               // TODO adjust vibrato range, calculate from constants
-              vib_phase = 125000L + 7400L * square_scale(angle);
+              vib_phase = VIB_BASE + VIB_SCALE * square_scale(angle);
 
               // TODO make tapping the z button toggle lock-to-semitone
               if(nunchuck_zbutton() == 0){
@@ -214,13 +228,23 @@ int main(void){
               }
             } else if (ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
             { //Classic or Pro
+              env_phase = 1656;
               uint8_t classic_byax = extension_classic_byax();
               uint8_t classic_dpad = extension_classic_dpad();
-              if(classic_byax){
-                phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1] + vib_offset);
-                volume = 127;
+              if(classic_byax^last_byax){
+                debounce_byax = 0;
+                last_byax = classic_byax;
               } else {
-                volume = 0;
+                ++debounce_byax;
+                if(debounce_byax > DEBOUNCE){
+                  if(classic_byax){
+                    phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1] + vib_offset);
+                    volume = 127;
+                    was_pressed = true;
+                  } else {
+                    was_pressed = false;
+                  }
+                }
               }
               if(classic_dpad){
                 for(int dpadcount = 0; dpadcount < 4; ++dpadcount){
@@ -235,7 +259,7 @@ int main(void){
               joy_y = (extension_classic_ljoyy() << 2) - 127;
               angle = atan2_int(abs(joy_y), joy_x);
               // TODO adjust vibrato range, calculate from constants
-              vib_phase = 125000L + 7400L * square_scale(angle);
+              vib_phase = VIB_BASE + VIB_SCALE * square_scale(angle);
             }
           }
         }
