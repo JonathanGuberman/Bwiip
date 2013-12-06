@@ -11,6 +11,7 @@
 #include "TinyWireM.h"        // I2C library for ATtiny AVR
 #include "nunchuck_funcs.h"   // Wii Nunchuck helper functions
 #include <avr/pgmspace.h>
+#include <avr/eeprom.h>
 
 volatile uint32_t accumulator, phase, vib_accumulator, vib_phase;
 volatile uint16_t counter, env_accumulator, env_phase;
@@ -99,9 +100,13 @@ const int8_t wavetable[TOTALWAVES][256] PROGMEM = {
 #define TRIANGLE 1
 #define SAWTOOTH 2
 #define SINE 3
-volatile int8_t currentwave = SQUARE;
-int8_t vibwaveup = SINE;
-int8_t vibwavedown = SAWTOOTH;
+volatile uint8_t currentwave;
+uint8_t vibwaveup;
+uint8_t vibwavedown;
+
+uint8_t EEMEM stored_currentwave = SQUARE;
+uint8_t EEMEM stored_vibwaveup = SINE;
+uint8_t EEMEM stored_vibwavedown = SAWTOOTH;
 
 uint8_t ext_id[6];
 const int8_t button_intervals[15] = {4, 7, 5, 0, 2, 1, 3, 11, 8, 9, 6, 12, 13, 10, -1};
@@ -168,6 +173,10 @@ int main(void){
 
     uint16_t angle, last_byax, debounce_byax; 
 
+    currentwave = eeprom_read_byte(&stored_currentwave);
+    vibwaveup = eeprom_read_byte(&stored_vibwaveup);
+    vibwavedown = eeprom_read_byte(&stored_vibwavedown);
+
     for(;;){
       cli();
       loop_until_bit_is_set(PINB,PB3);
@@ -181,6 +190,7 @@ int main(void){
       // Enable interrupts for sound generation;
       // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
       //sei();
+
       while(bit_is_set(PINB,PB3)){
         int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll, env_subtract, env_add;
         
@@ -271,6 +281,11 @@ int main(void){
                   }
                   classic_dpad >>= 1;
                 }
+              }
+              if(extension_classic_home()){
+                eeprom_update_byte(&stored_currentwave, currentwave);
+                eeprom_update_byte(&stored_vibwaveup, vibwaveup);
+                eeprom_update_byte(&stored_vibwavedown, vibwavedown);
               }
               joy_x = (extension_classic_ljoyx() << 2) - 127;
               joy_y = (extension_classic_ljoyy() << 2) - 127;
