@@ -228,7 +228,7 @@ int main(void){
               }
             } else if (ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
             { //Classic or Pro
-              env_phase = 1656;
+              env_phase = 128*(31-extension_classic_rtrig_analogue()) + 256;
               uint8_t classic_byax = extension_classic_byax();
               uint8_t classic_dpad = extension_classic_dpad();
               if(classic_byax^last_byax){

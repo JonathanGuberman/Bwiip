@@ -152,4 +152,10 @@ static uint8_t extension_classic_rjoyy()
     return nunchuck_buf[2] & 0x1F;
 }
 
+static uint8_t extension_classic_rtrig_analogue(){
+    return nunchuck_buf[3] & 0x1F;
+}
 
+static uint8_t extension_classic_ltrig_analogue(){
+    return (((nunchuck_buf[2] & 0x60) >> 2) | (nunchuck_buf[3] >> 5) ) & 0x1F;
+}
