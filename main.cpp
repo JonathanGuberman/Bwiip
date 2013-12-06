@@ -100,6 +100,8 @@ const int8_t wavetable[TOTALWAVES][256] PROGMEM = {
 #define SAWTOOTH 2
 #define SINE 3
 volatile int8_t currentwave = SQUARE;
+int8_t vibwaveup = SINE;
+int8_t vibwavedown = SAWTOOTH;
 
 uint8_t ext_id[6];
 const int8_t button_intervals[15] = {4, 7, 5, 0, 2, 1, 3, 11, 8, 9, 6, 12, 13, 10, -1};
@@ -182,7 +184,7 @@ int main(void){
       while(bit_is_set(PINB,PB3)){
         int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll, env_subtract, env_add;
         
-        vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
+        vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? vibwaveup : vibwavedown][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
         
         if(volume && !is_pressed && (env_accumulator & (1<<15))){
           volume -= volume > env_subtract ? env_subtract : volume;
@@ -258,7 +260,13 @@ int main(void){
               if(classic_dpad){
                 for(int dpadcount = 0; dpadcount < 4; ++dpadcount){
                   if(classic_dpad & 1){
-                    currentwave = dpadcount;
+                    if(extension_classic_plus()){
+                      vibwaveup = dpadcount;
+                    } else if (extension_classic_minus()){
+                      vibwavedown = dpadcount;
+                    } else {
+                      currentwave = dpadcount;
+                    }
                     break;
                   }
                   classic_dpad >>= 1;

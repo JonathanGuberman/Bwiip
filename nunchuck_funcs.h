@@ -169,3 +169,16 @@ static uint8_t extension_classic_zr()
 {
     return ((~nunchuck_buf[5]) >> 2) & 1;
 }
+
+static uint8_t extension_classic_plus()
+{
+    return ((~nunchuck_buf[4]) >> 2) & 1;
+}
+static uint8_t extension_classic_minus()
+{
+    return ((~nunchuck_buf[4]) >> 4) & 1;
+}
+static uint8_t extension_classic_home()
+{
+    return ((~nunchuck_buf[4]) >> 3) & 1;
+}
