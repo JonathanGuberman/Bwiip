@@ -159,3 +159,13 @@ static uint8_t extension_classic_rtrig_analogue(){
 static uint8_t extension_classic_ltrig_analogue(){
     return (((nunchuck_buf[2] & 0x60) >> 2) | (nunchuck_buf[3] >> 5) ) & 0x1F;
 }
+
+static uint8_t extension_classic_zl()
+{
+    return ((~nunchuck_buf[5]) >> 7);
+}
+
+static uint8_t extension_classic_zr()
+{
+    return ((~nunchuck_buf[5]) >> 2) & 1;
+}

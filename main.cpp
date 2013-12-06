@@ -248,7 +248,7 @@ int main(void){
                 if(debounce_byax > DEBOUNCE){
                   if(classic_byax){
                     //TODO Some way to keep vibrato going during the release phase
-                    phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1] + vib_offset);
+                    phase = phase_from_cents(2048 + 100*(button_intervals[classic_byax-1] - extension_classic_zl() + extension_classic_zr()) + vib_offset);
                     is_pressed = true;
                   } else {
                     is_pressed = false;
