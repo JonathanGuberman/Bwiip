@@ -180,12 +180,16 @@ int main(void){
       // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
       //sei();
       while(bit_is_set(PINB,PB3)){
-        int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll, env_subtract;
+        int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll, env_subtract, env_add;
         
         vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
         
         if(volume && !is_pressed && (env_accumulator & (1<<15))){
           volume -= volume > env_subtract ? env_subtract : volume;
+          env_accumulator = 0;
+        }
+        if(is_pressed && (env_accumulator & (1<<15))){
+          volume = (volume + env_add) < 128 ? volume + env_add : 128;
           env_accumulator = 0;
         }
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often (10ms = 1/100s, hence the div by 100)
@@ -230,7 +234,10 @@ int main(void){
             { //Classic or Pro
               env_phase = 322;
               uint8_t rtrig_temp = 31-extension_classic_rtrig_analogue();
+              uint8_t ltrig_temp = 31-extension_classic_ltrig_analogue();
               env_subtract = ((rtrig_temp*rtrig_temp*rtrig_temp) >> 10) + 1;
+              env_add = ((ltrig_temp*ltrig_temp*ltrig_temp) >> 10) + 1;
+              
               uint8_t classic_byax = extension_classic_byax();
               uint8_t classic_dpad = extension_classic_dpad();
               if(classic_byax^last_byax){
@@ -240,8 +247,8 @@ int main(void){
                 ++debounce_byax;
                 if(debounce_byax > DEBOUNCE){
                   if(classic_byax){
+                    //TODO Some way to keep vibrato going during the release phase
                     phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1] + vib_offset);
-                    volume = 127;
                     is_pressed = true;
                   } else {
                     is_pressed = false;
