@@ -11,12 +11,18 @@
 #include "TinyWireM.h"        // I2C library for ATtiny AVR
 #include "nunchuck_funcs.h"   // Wii Nunchuck helper functions
 #include <avr/pgmspace.h>
+#include <avr/eeprom.h>
 
-volatile uint32_t accumulator, phase, volume, vib_accumulator, vib_phase;
-volatile uint16_t counter;
+volatile uint32_t accumulator, phase, vib_accumulator, vib_phase;
+volatile uint16_t counter, env_accumulator, env_phase;
+volatile uint8_t volume;
+volatile bool is_pressed;
+
+
 uint8_t outvalue; 
 
-const int8_t wavetable[4][256] PROGMEM = {
+#define TOTALWAVES 4
+const int8_t wavetable[TOTALWAVES][256] PROGMEM = {
   {
     127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
     127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
@@ -94,29 +100,44 @@ const int8_t wavetable[4][256] PROGMEM = {
 #define TRIANGLE 1
 #define SAWTOOTH 2
 #define SINE 3
+volatile uint8_t currentwave;
+uint8_t vibwaveup;
+uint8_t vibwavedown;
+
+uint8_t EEMEM stored_currentwave = SQUARE;
+uint8_t EEMEM stored_vibwaveup = SINE;
+uint8_t EEMEM stored_vibwavedown = SAWTOOTH;
 
 uint8_t ext_id[6];
+const int8_t button_intervals[15] = {4, 7, 5, 0, 2, 1, 3, 11, 8, 9, 6, 12, 13, 10, -1};
 
-#define SAMPLE_RATE 25000
+#define SAMPLE_RATE 12000
 #define COUNTER_OVERFLOW ((F_CPU/8)/SAMPLE_RATE)
 #define PHASESCALE (((uint64_t)1 << 32)/(1000000.0/(COUNTER_OVERFLOW-1.0)))
 #define BASENOTE (uint32_t)(PHASESCALE*65.4064 + 0.5)
+#define VIB_BASE (uint32_t)(PHASESCALE*0.75 + 0.5)
+#define VIB_SCALE (uint32_t)(PHASESCALE*0.044 + 0.5)
 #define CENTS_LUT_SIZE 13
 #define CENTS_COMPRESS 10
+#define DEBOUNCE 5
 
 // TODO calculate from sample rate and clock speed
 uint32_t cents_lut[CENTS_LUT_SIZE] = {8197, 8201,8211,8230,8268,8345,8501,8821,9498,11011,14800,26739,87278};
 
+// Function prototypes
 int16_t atan2_int(int16_t y, int16_t x);
 int16_t radius(int16_t y, int16_t x);
 int32_t square_scale(int32_t x);
+uint32_t phase_from_cents(int16_t cents);
 
  
 ISR (TIMER0_COMPA_vect){
     accumulator += phase;
     vib_accumulator += vib_phase;
+    env_accumulator += env_phase;
     
-    outvalue = volume*((accumulator >> 31) ? 1 : -1) + 127;
+    //outvalue = volume*((accumulator >> 31) ? 1 : -1) + 127;
+    outvalue = (volume*((int8_t)pgm_read_byte(&wavetable[currentwave][accumulator >> 24])) >> 8) + 127;
     
     OCR1B = outvalue;
     
@@ -148,71 +169,131 @@ int main(void){
     // for a 32-bit DDS accumulator, running at Fclock:
     // phase = 2^32*Fout/Fclock (where Fclock is the refresh rate)
     // phase = (long)(167503.724544*660.0);    
-    int16_t vib_offset, cents_from_basenote;
+    int16_t vib_offset;
 
-    uint16_t angle; 
-    int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll;
+    uint16_t angle, last_byax, debounce_byax; 
+
+    currentwave = eeprom_read_byte(&stored_currentwave);
+    vibwaveup = eeprom_read_byte(&stored_vibwaveup);
+    vibwavedown = eeprom_read_byte(&stored_vibwavedown);
 
     for(;;){
       cli();
       loop_until_bit_is_set(PINB,PB3);
 
+      sei();
       do{
         _delay_ms(100);
-        nunchuck_init(ext_id);
+        extension_init(ext_id);
       } while(ext_id[2] != 0xA4);
       //if(ext_id[0] == 0 && ext_id[1] == 0 && ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
       // Enable interrupts for sound generation;
       // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
-      sei();
-      counter=0;
+      //sei();
+
       while(bit_is_set(PINB,PB3)){
-        vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
+        int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll, env_subtract, env_add;
+        
+        vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? vibwaveup : vibwavedown][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
+        
+        if(volume && !is_pressed && (env_accumulator & (1<<15))){
+          volume -= volume > env_subtract ? env_subtract : volume;
+          env_accumulator = 0;
+        }
+        if(is_pressed && (env_accumulator & (1<<15))){
+          volume = (volume + env_add) < 128 ? volume + env_add : 128;
+          env_accumulator = 0;
+        }
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often (10ms = 1/100s, hence the div by 100)
         if(counter > SAMPLE_RATE/100){
           counter = 0; // Reset counter to ensure that nunchuck isn't polled too often
-          if(nunchuck_get_data()){
-            // TODO modify atan2 to use full 10-bit data
-            accel_x = (nunchuck_accelx() >> 2) - 127;
-            accel_y = (nunchuck_accely() >> 2) - 127;
-            accel_z = (nunchuck_accelz() >> 2) - 127;
-            joy_x = nunchuck_joyx() - 127;
-            joy_y = nunchuck_joyy() - 127;
-            angle = atan2_int(abs(joy_y), joy_x);
-            // TODO adjust vibrato range, calculate from constants
-            vib_phase = 125000L + 7400L * square_scale(angle);
+          if(extension_get_data()){
+            if(ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x00 && ext_id[5] == 0x00)
+            { // Nunchuck
+              env_phase = 0;
+              env_accumulator = 0;
+              is_pressed = true;
+              
+              // TODO modify atan2 to use full 10-bit data
+              accel_x = (nunchuck_accelx() >> 2) - 127;
+              accel_y = (nunchuck_accely() >> 2) - 127;
+              accel_z = (nunchuck_accelz() >> 2) - 127;
+              joy_x = nunchuck_joyx() - 127;
+              joy_y = nunchuck_joyy() - 127;
+              angle = atan2_int(abs(joy_y), joy_x);
+              // TODO adjust vibrato range, calculate from constants
+              vib_phase = VIB_BASE + VIB_SCALE * square_scale(angle);
 
-            // TODO make tapping the z button toggle lock-to-semitone
-            if(nunchuck_zbutton() == 0){
-              /* 
-               * Roll from three access accelerometer equation adapted from Freescale Semiconductors application
-               * note "Tilt Sensing Using a Three-Axis Accelerometer" (AN3461, rev 6), equation #38
-               * http://www.freescale.com/files/sensors/doc/app_note/AN3461.pdf
-               */
-              roll = atan2_int(accel_x, (accel_z < 0 ? -1 : 1) * (abs(accel_z) +abs(accel_y >> 3)));
-            }
-            
-            // TODO adjust note range
-            cents_from_basenote = 4*(roll + 512 + vib_offset);
-            uint32_t temp_phase = BASENOTE;
-            for(int i = 0; i < CENTS_LUT_SIZE; ++i){
-              if(cents_from_basenote & 0x01){
-                temp_phase >>= CENTS_COMPRESS;
-                temp_phase *= (uint32_t)cents_lut[i];
-                temp_phase >>= 3;
+              // TODO make tapping the z button toggle lock-to-semitone
+              if(nunchuck_zbutton() == 0){
+                /* 
+                 * Roll from three access accelerometer equation adapted from Freescale Semiconductors application
+                 * note "Tilt Sensing Using a Three-Axis Accelerometer" (AN3461, rev 6), equation #38
+                 * http://www.freescale.com/files/sensors/doc/app_note/AN3461.pdf
+                 */
+                roll = atan2_int(accel_x, (accel_z < 0 ? -1 : 1) * (abs(accel_z) +abs(accel_y >> 3)));
               }
-              cents_from_basenote >>= 1;
-            }
-            phase = temp_phase;
+            
+              // TODO adjust note range
+              phase = phase_from_cents(4*(roll + 512 + vib_offset));
 
-            if(nunchuck_cbutton()){
-              volume = 0;
-            } else {
-              volume = (255-75) - (accel_y + 127); // Reversed so that "down" is mute and "up" is loud
+              if(nunchuck_cbutton()){
+                volume = 0;
+              } else {
+                volume = (255-75) - (accel_y + 127); // Reversed so that "down" is mute and "up" is loud
+              }
+            } else if (ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
+            { //Classic or Pro
+              env_phase = 322;
+              uint8_t rtrig_temp = 31-extension_classic_rtrig_analogue();
+              uint8_t ltrig_temp = 31-extension_classic_ltrig_analogue();
+              env_subtract = ((rtrig_temp*rtrig_temp*rtrig_temp) >> 10) + 1;
+              env_add = ((ltrig_temp*ltrig_temp*ltrig_temp) >> 10) + 1;
+              
+              uint8_t classic_byax = extension_classic_byax();
+              uint8_t classic_dpad = extension_classic_dpad();
+              if(classic_byax^last_byax){
+                debounce_byax = 0;
+                last_byax = classic_byax;
+              } else {
+                ++debounce_byax;
+                if(debounce_byax > DEBOUNCE){
+                  if(classic_byax){
+                    //TODO Some way to keep vibrato going during the release phase
+                    phase = phase_from_cents(2048 + 100*(button_intervals[classic_byax-1] - extension_classic_zl() + extension_classic_zr()) + vib_offset);
+                    is_pressed = true;
+                  } else {
+                    is_pressed = false;
+                  }
+                }
+              }
+              if(classic_dpad){
+                for(int dpadcount = 0; dpadcount < 4; ++dpadcount){
+                  if(classic_dpad & 1){
+                    if(extension_classic_plus()){
+                      vibwaveup = dpadcount;
+                    } else if (extension_classic_minus()){
+                      vibwavedown = dpadcount;
+                    } else {
+                      currentwave = dpadcount;
+                    }
+                    break;
+                  }
+                  classic_dpad >>= 1;
+                }
+              }
+              if(extension_classic_home()){
+                eeprom_update_byte(&stored_currentwave, currentwave);
+                eeprom_update_byte(&stored_vibwaveup, vibwaveup);
+                eeprom_update_byte(&stored_vibwavedown, vibwavedown);
+              }
+              joy_x = (extension_classic_ljoyx() << 2) - 127;
+              joy_y = (extension_classic_ljoyy() << 2) - 127;
+              angle = atan2_int(abs(joy_y), joy_x);
+              // TODO adjust vibrato range, calculate from constants
+              vib_phase = VIB_BASE + VIB_SCALE * square_scale(angle);
             }
-          } /*else {
-            volume = 0;
-          }*/
+          }
         }
       }
     };
@@ -252,4 +333,17 @@ int16_t radius(int16_t y, int16_t x){
 //TODO convert this to 16 bit data types without messing it all up
 int32_t square_scale(int32_t x){
   return (x * x) >> 8;
+}
+
+uint32_t phase_from_cents(int16_t cents){
+  uint32_t temp_phase = BASENOTE;
+  for(int i = 0; i < CENTS_LUT_SIZE; ++i){
+    if(cents & 0x01){
+      temp_phase >>= CENTS_COMPRESS;
+      temp_phase *= (uint32_t)cents_lut[i];
+      temp_phase >>= 3;
+    }
+    cents >>= 1;
+  }
+  return temp_phase;
 }
