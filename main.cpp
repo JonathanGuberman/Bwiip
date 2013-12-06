@@ -180,12 +180,12 @@ int main(void){
       // do this after nunchuck init, otherwise sometimes things go funny (for timing reasons, I assume).
       //sei();
       while(bit_is_set(PINB,PB3)){
-        int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll;
+        int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll, env_subtract;
         
         vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
         
         if(volume && !was_pressed && (env_accumulator & (1<<15))){
-          volume--;
+          volume -= volume > env_subtract ? env_subtract : volume;
           env_accumulator = 0;
         }
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often (10ms = 1/100s, hence the div by 100)
@@ -228,7 +228,9 @@ int main(void){
               }
             } else if (ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
             { //Classic or Pro
-              env_phase = 128*(31-extension_classic_rtrig_analogue()) + 256;
+              env_phase = 322;
+              uint8_t rtrig_temp = 31-extension_classic_rtrig_analogue();
+              env_subtract = 2*((rtrig_temp*rtrig_temp) >> 5) +1;
               uint8_t classic_byax = extension_classic_byax();
               uint8_t classic_dpad = extension_classic_dpad();
               if(classic_byax^last_byax){
