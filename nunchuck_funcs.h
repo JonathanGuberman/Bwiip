@@ -74,7 +74,11 @@ static uint8_t extension_get_data()
     }
     extension_send_request();  // send request for next data payload
     if (cnt >= 5) {
-        return 1;   // success
+        for (int i = 0; i < 6; i++){
+            if (nunchuck_buf[i] > 0 && nunchuck_buf[i] < 255){
+                return 1; //success
+            }
+        }
     }
     return 0; //failure
 }
