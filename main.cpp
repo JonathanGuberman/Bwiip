@@ -15,7 +15,7 @@
 volatile uint32_t accumulator, phase, vib_accumulator, vib_phase;
 volatile uint16_t counter, env_accumulator, env_phase;
 volatile uint8_t volume;
-volatile bool was_pressed;
+volatile bool is_pressed;
 
 
 uint8_t outvalue; 
@@ -184,7 +184,7 @@ int main(void){
         
         vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? SINE : SAWTOOTH][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
         
-        if(volume && !was_pressed && (env_accumulator & (1<<15))){
+        if(volume && !is_pressed && (env_accumulator & (1<<15))){
           volume -= volume > env_subtract ? env_subtract : volume;
           env_accumulator = 0;
         }
@@ -196,7 +196,7 @@ int main(void){
             { // Nunchuck
               env_phase = 0;
               env_accumulator = 0;
-              was_pressed = true;
+              is_pressed = true;
               
               // TODO modify atan2 to use full 10-bit data
               accel_x = (nunchuck_accelx() >> 2) - 127;
@@ -229,8 +229,8 @@ int main(void){
             } else if (ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
             { //Classic or Pro
               env_phase = 322;
-              uint8_t rtrig_temp = 31-extension_classic_rtrig_analogue();
-              env_subtract = 2*((rtrig_temp*rtrig_temp) >> 5) +1;
+              uint8_t rtrig_temp = 32-extension_classic_rtrig_analogue();
+              env_subtract = ((rtrig_temp*rtrig_temp*rtrig_temp) >> 10) + 1;
               uint8_t classic_byax = extension_classic_byax();
               uint8_t classic_dpad = extension_classic_dpad();
               if(classic_byax^last_byax){
@@ -242,9 +242,9 @@ int main(void){
                   if(classic_byax){
                     phase = phase_from_cents(2048 + 100*button_intervals[classic_byax-1] + vib_offset);
                     volume = 127;
-                    was_pressed = true;
+                    is_pressed = true;
                   } else {
-                    was_pressed = false;
+                    is_pressed = false;
                   }
                 }
               }
