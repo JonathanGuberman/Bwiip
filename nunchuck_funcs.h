@@ -17,6 +17,13 @@
 
 #define WII_I2C_ADDR 0x52
 
+#define DRUM_BASS 0
+#define DRUM_BLUE 1
+#define DRUM_GREEN 2
+#define DRUM_YELLOW 3
+#define DRUM_RED 4
+#define DRUM_ORANGE 5
+
 static uint8_t nunchuck_buf[6];   // array to store nunchuck data,
 
 // initialize the I2C system, join the I2C bus,
@@ -185,4 +192,9 @@ static uint8_t extension_classic_minus()
 static uint8_t extension_classic_home()
 {
     return ((~nunchuck_buf[4]) >> 3) & 1;
+}
+
+static uint8_t extension_drums()
+{
+    return ((~nunchuck_buf[5]) >> 2) & 0x3F;
 }

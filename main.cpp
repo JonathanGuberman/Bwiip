@@ -18,6 +18,12 @@ volatile uint16_t counter, env_accumulator, env_phase;
 volatile uint8_t volume;
 volatile bool is_pressed;
 
+uint32_t lfsr = 0xAB5A55AA;
+uint8_t bit0, bit1;
+volatile int8_t lfsr_out;
+bool noise_on;
+#define BIT31 ((uint32_t)1 << 31)
+#define BIT28 ((uint32_t)1 << 28)
 
 uint8_t outvalue; 
 
@@ -137,11 +143,18 @@ ISR (TIMER0_COMPA_vect){
     env_accumulator += env_phase;
     
     //outvalue = volume*((accumulator >> 31) ? 1 : -1) + 127;
-    outvalue = (volume*((int8_t)pgm_read_byte(&wavetable[currentwave][accumulator >> 24])) >> 8) + 127;
+    outvalue = (volume*(noise_on ? lfsr_out : (int8_t)pgm_read_byte(&wavetable[currentwave][accumulator >> 24])) >> 8) + 127;
     
     OCR1B = outvalue;
     
     counter++;
+    
+    // implement the shift register
+    lfsr = lfsr << 1 ;
+    bit0 = (lfsr & BIT31) > 0;
+    bit1 = (lfsr & BIT28) > 0;
+    lfsr = lfsr + (bit0 ^ bit1);
+    lfsr_out = (lfsr & 0xFF)-127;
 }
 
 int main(void){  
@@ -192,18 +205,22 @@ int main(void){
       //sei();
 
       while(bit_is_set(PINB,PB3)){
-        int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll, env_subtract, env_add;
+        int16_t accel_x, accel_y, accel_z, joy_x, joy_y, roll, env_subtract, env_add, pitch_bend;
         
         vib_offset = ((int8_t)pgm_read_byte(&wavetable[joy_y > 0 ? vibwaveup : vibwavedown][vib_accumulator >> 24])*square_scale(radius(joy_y,joy_x))) >> 7;
         
-        if(volume && !is_pressed && (env_accumulator & (1<<15))){
-          volume -= volume > env_subtract ? env_subtract : volume;
-          env_accumulator = 0;
+        if((env_accumulator & (1<<15))){
+          env_accumulator = 0; 
+          if(volume && !is_pressed){
+            volume -= volume > env_subtract ? env_subtract : volume;
+            if(pitch_bend) {phase = (15*phase)/16;}
+          }
+          if(env_add && is_pressed){
+            volume = (volume + env_add) < 128 ? volume + env_add : 128;
+          }
         }
-        if(is_pressed && (env_accumulator & (1<<15))){
-          volume = (volume + env_add) < 128 ? volume + env_add : 128;
-          env_accumulator = 0;
-        }
+        
+            
         // Counter replaces the 10ms delay to ensure nunchuck isn't polled too often (10ms = 1/100s, hence the div by 100)
         if(counter > SAMPLE_RATE/100){
           counter = 0; // Reset counter to ensure that nunchuck isn't polled too often
@@ -213,6 +230,8 @@ int main(void){
               env_phase = 0;
               env_accumulator = 0;
               is_pressed = true;
+              pitch_bend=0;
+              noise_on = false;
               
               // TODO modify atan2 to use full 10-bit data
               accel_x = (nunchuck_accelx() >> 2) - 127;
@@ -244,6 +263,8 @@ int main(void){
               }
             } else if (ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x01)
             { //Classic or Pro
+              noise_on = false;
+              pitch_bend=0;
               env_phase = 322;
               uint8_t rtrig_temp = 31-extension_classic_rtrig_analogue();
               uint8_t ltrig_temp = 31-extension_classic_ltrig_analogue();
@@ -292,6 +313,49 @@ int main(void){
               angle = atan2_int(abs(joy_y), joy_x);
               // TODO adjust vibrato range, calculate from constants
               vib_phase = VIB_BASE + VIB_SCALE * square_scale(angle);
+            }   else if (ext_id[0] == 0x01 && ext_id[2] == 0xA4 && ext_id[3] == 0x20 && ext_id[4] == 0x01 && ext_id[5] == 0x03)
+            { //Drums
+              env_subtract = 16;
+              env_add = 0;
+              pitch_bend = true;
+              is_pressed = false;
+              
+              uint8_t drums = extension_drums();
+              if(drums){
+                int whichdrum = 0;
+                for(; whichdrum < 6; ++whichdrum){
+                  if(drums & 1){
+                    break;
+                  }
+                  drums >>= 1;
+                }
+                switch(whichdrum){
+                  case DRUM_GREEN:
+                  env_phase = 320;
+                  noise_on = false;
+                  phase = phase_from_cents(1200);
+                  break;
+                  case DRUM_BLUE:
+                  env_phase = 320;
+                  noise_on = false;
+                  phase = phase_from_cents(2400);
+                  break;
+                  case DRUM_RED:
+                  env_phase = 320;
+                  noise_on = false;
+                  phase = phase_from_cents(3600);
+                  break;
+                  case DRUM_ORANGE:
+                  env_phase = 50;
+                  noise_on = true;
+                  break;
+                  case DRUM_YELLOW:
+                  env_phase = 600;
+                  noise_on = true;
+                  break;
+                }
+                volume = 255;
+              }
             }
           }
         }
